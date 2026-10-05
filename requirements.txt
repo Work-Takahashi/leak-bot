@@ -1,0 +1,5 @@
+feedparser
+requests
+tweepy
+# Claude で翻訳する場合のみ必要
+anthropic
