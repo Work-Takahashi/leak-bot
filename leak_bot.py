@@ -27,6 +27,7 @@ GEMINI_THINKING = os.environ.get("GEMINI_THINKING") or "low"  # 考える量を�
 TITLE_DEDUP_DAYS = 3      # 同じタイトルの投稿がこの日数以内に来たら送らない
 MAX_TITLES = 500          # 覚えておくタイトルの数
 MAX_TRANSLATE_TRIES = 3   # 翻訳に失敗したら、この回数の実行まで持ち越して再挑戦する
+FETCH_ALERT_AFTER = 8     # Reddit の取得失敗がこの回数（15分おきなら約2時間）続いたらエラーで知らせる
 RUN_TIME_BUDGET = 6 * 60  # 1回の実行で翻訳に使う最大秒数（残りは次回へ）
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL") or "claude-haiku-4-5-20251001"
 ENABLE_X = (os.environ.get("ENABLE_X") or "false").lower() == "true"
@@ -81,11 +82,17 @@ def save_state(state):
 
 
 # ===== Reddit =====
+class FetchError(Exception):
+    """Reddit からフィードを取れなかった（混雑・一時的な拒否・通信エラーなど）"""
+
+
 def fetch_entries():
-    res = requests.get(FEED_URL, headers={"User-Agent": USER_AGENT}, timeout=30)
-    if res.status_code in (403, 429):
-        sys.exit(f"Reddit に拒否されました (HTTP {res.status_code})。README の「Reddit に弾かれた場合」を参照してください。")
-    res.raise_for_status()
+    try:
+        res = requests.get(FEED_URL, headers={"User-Agent": USER_AGENT}, timeout=30)
+    except requests.RequestException as err:
+        raise FetchError(f"通信エラー ({type(err).__name__})")
+    if res.status_code != 200:
+        raise FetchError(f"HTTP {res.status_code}")
     return feedparser.parse(res.content).entries
 
 
@@ -230,8 +237,25 @@ def post_x(text):
 # ===== メイン =====
 def main():
     started = time.time()
-    entries = fetch_entries()
     state = load_state()
+    try:
+        entries = fetch_entries()
+    except FetchError as err:
+        if state is None:
+            sys.exit(f"Reddit からフィードを取れませんでした: {err}")
+        streak = state.get("fetch_fail_streak", 0) + 1
+        state["fetch_fail_streak"] = streak
+        save_state(state)
+        if streak >= FETCH_ALERT_AFTER:
+            # 長く続くときだけ赤い×にして知らせる（本当にブロックされている可能性）
+            sys.exit(f"Reddit から {streak} 回連続で取得できません: {err}。"
+                     "README の「Reddit に弾かれた場合」を参照してください。")
+        print(f"Reddit から取得できませんでした（{err}、{streak} 回目）。次回の実行で取り直します。")
+        return
+    if state is not None and state.get("fetch_fail_streak"):
+        print(f"Reddit からの取得が回復しました（{state['fetch_fail_streak']} 回失敗のあと）")
+        state["fetch_fail_streak"] = 0
+        save_state(state)
 
     if state is None:
         # 初回は既存の投稿を既読にするだけ（過去分を一気に流さない）
