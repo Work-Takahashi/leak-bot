@@ -3,6 +3,7 @@ Reddit (r/GamingLeaksAndRumours) の新着を取得し、
 Gemini（無料枠）または Claude で日本語に要約して Discord に通知、(有効時は) X にも投稿するスクリプト。
 GitHub Actions で定期実行する想定。
 """
+import calendar
 import html
 import json
 import os
@@ -15,7 +16,18 @@ import feedparser
 import requests
 
 # ===== 設定 =====
+SUBREDDIT = "GamingLeaksAndRumours"
+# 取得元: "arctic"（Arctic Shift の JSON API。フレアで絞り込める）または "rss"（Reddit 本体の RSS）
+# arctic が取れないときは自動で rss に切り替える
+SOURCE = (os.environ.get("SOURCE") or "arctic").lower()
+ARCTIC_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
+ARCTIC_LIMIT = 100
+# 通知するフレア（カンマ区切り。空なら全部）。例: "Leak" / "Leak,Rumour"
+FLAIR_FILTER = [f.strip() for f in (os.environ.get("FLAIR_FILTER") or "Leak").split(",") if f.strip()]
 FEED_URL = os.environ.get("FEED_URL") or "https://www.reddit.com/r/GamingLeaksAndRumours/new/.rss"
+# rss で取るときにフレアで絞る場合は Reddit 検索の RSS を使う
+FLAIR_FEED_URL = ("https://www.reddit.com/r/GamingLeaksAndRumours/search.rss?restrict_sr=1&sort=new&q="
+                  + "+OR+".join(requests.utils.quote(f'flair:"{f}"') for f in FLAIR_FILTER))
 DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 TRANSLATOR = (os.environ.get("TRANSLATOR") or "gemini").lower()  # "gemini"（無料）または "claude"
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash"
@@ -28,6 +40,7 @@ TITLE_DEDUP_DAYS = 3      # 同じタイトルの投稿がこの日数以内に�
 MAX_TITLES = 500          # 覚えておくタイトルの数
 MAX_TRANSLATE_TRIES = 3   # 翻訳に失敗したら、この回数の実行まで持ち越して再挑戦する
 FETCH_ALERT_AFTER = 8     # Reddit の取得失敗がこの回数（15分おきなら約2時間）続いたらエラーで知らせる
+SWITCH_MARGIN = 60 * 60  # 取得元の切替時、前回実行のこの秒数前より新しい投稿は通知候補に残す
 RUN_TIME_BUDGET = 6 * 60  # 1回の実行で翻訳に使う最大秒数（残りは次回へ）
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL") or "claude-haiku-4-5-20251001"
 ENABLE_X = (os.environ.get("ENABLE_X") or "false").lower() == "true"
@@ -86,14 +99,71 @@ class FetchError(Exception):
     """Reddit からフィードを取れなかった（混雑・一時的な拒否・通信エラーなど）"""
 
 
-def fetch_entries():
+def _get(url, **kw):
     try:
-        res = requests.get(FEED_URL, headers={"User-Agent": USER_AGENT}, timeout=30)
+        res = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30, **kw)
     except requests.RequestException as err:
         raise FetchError(f"通信エラー ({type(err).__name__})")
     if res.status_code != 200:
         raise FetchError(f"HTTP {res.status_code}")
-    return feedparser.parse(res.content).entries
+    return res
+
+
+def fetch_arctic():
+    """Arctic Shift から新着を取り、共通の形（新しい順）にそろえる"""
+    res = _get(ARCTIC_URL, params={"subreddit": SUBREDDIT, "limit": ARCTIC_LIMIT, "sort": "desc"})
+    try:
+        posts = res.json()["data"]
+    except (ValueError, KeyError, TypeError):
+        raise FetchError("Arctic Shift の応答が想定外の形式です")
+    items = []
+    for p in posts:
+        if not p.get("id"):
+            continue
+        body = p.get("selftext") or ""
+        if body in ("[removed]", "[deleted]"):
+            body = ""
+        if not p.get("is_self") and p.get("url"):
+            body = (body + " " + p["url"]).strip()  # リンク投稿は貼られたURLを本文に足す
+        items.append({
+            "id": "t3_" + p["id"],  # RSS と同じ ID 形式にそろえる（seen.json を共用するため）
+            "title": p.get("title") or "",
+            "body": body,
+            "link": "https://www.reddit.com" + (p.get("permalink") or f"/comments/{p['id']}/"),
+            "flair": p.get("link_flair_text"),
+            "created": p.get("created_utc") or 0,
+        })
+    return items
+
+
+def fetch_rss():
+    """Reddit 本体の RSS から新着を取り、共通の形（新しい順）にそろえる"""
+    url = FLAIR_FEED_URL if (FLAIR_FILTER and not os.environ.get("FEED_URL")) else FEED_URL
+    entries = feedparser.parse(_get(url).content).entries
+    return [{
+        "id": e.id,
+        "title": e.get("title", ""),
+        "body": clean_text(e.get("summary") or (e.get("content") or [{}])[0].get("value", "")),
+        "link": e.get("link", ""),
+        "flair": None,  # RSS にはフレアが載らない（検索 RSS 側で絞り込み済み）
+        "created": calendar.timegm(e.published_parsed) if e.get("published_parsed") else 0,
+    } for e in entries]
+
+
+def fetch_entries():
+    """(取得元の名前, 投稿リスト) を返す。arctic が駄目なら rss に切り替える"""
+    if SOURCE == "arctic":
+        try:
+            return "arctic", fetch_arctic()
+        except FetchError as err:
+            print(f"Arctic Shift から取得できませんでした（{err}）→ Reddit の RSS に切り替えます")
+    return "rss", fetch_rss()
+
+
+def flair_ok(item):
+    if not FLAIR_FILTER or item["flair"] is None:  # フレア情報がない（RSS）は絞り込み済みとみなす
+        return True
+    return item["flair"] in FLAIR_FILTER
 
 
 def clean_text(raw):
@@ -189,13 +259,14 @@ def summarize(title, body, deadline=None):
 
 
 # ===== Discord =====
-def post_discord(title_ja, summary_ja, url, original_title):
+def post_discord(title_ja, summary_ja, url, original_title, flair=None):
+    footer = f"[{flair}] 原文: {original_title}" if flair else f"原文: {original_title}"
     payload = {
         "embeds": [{
             "title": (title_ja or original_title or "(無題)")[:256],
             "url": url,
             "description": (summary_ja or "(本文なし)")[:4000],
-            "footer": {"text": f"原文: {original_title}"[:2048]},
+            "footer": {"text": footer[:2048]},
             "color": 0xFF4500,
         }]
     }
@@ -239,7 +310,7 @@ def main():
     started = time.time()
     state = load_state()
     try:
-        entries = fetch_entries()
+        source, entries = fetch_entries()
     except FetchError as err:
         if state is None:
             sys.exit(f"Reddit からフィードを取れませんでした: {err}")
@@ -258,32 +329,56 @@ def main():
         save_state(state)
 
     if state is None:
-        # 初回は既存の投稿を既読にするだけ（過去分を一気に流さない）
+        # 初回は、いま見えている投稿を既読にするだけ（過去分を一気に流さない）
+        # 例: arctic は直近約1週間・100件を返すので、そのまま流すと Leak だけで数十件が一度に届く
         now = time.time()
-        save_state({"seen": [e.id for e in reversed(entries)], "fails": {},
-                    "titles": {title_key(e.get("title", "")): now for e in entries}})
-        print(f"初回実行：{len(entries)} 件を既読登録しました。次回から新着を通知します。")
+        state = {"seen": [e["id"] for e in reversed(entries)], "fails": {},
+                 "titles": {title_key(e["title"]): now for e in entries},
+                 "source": source, "last_ok": now}
+        save_state(state)
+        print(f"初回実行：{len(entries)} 件を通知せず既読登録しました。次回から新着を通知します。")
         return
+
+    if state.get("source") != source:
+        # 取得元が変わった（arctic ⇄ rss）。前回の実行より十分古い投稿は前の取得元で処理済みとみなし、
+        # 既読にするだけにする。それより新しい投稿は通常どおり処理する（同じタイトルの重複は下で弾く）
+        cutoff = state.get("last_ok", time.time()) - SWITCH_MARGIN
+        known = set(state["seen"])
+        old = [e["id"] for e in reversed(entries)
+               if e["id"] not in known and (not e["created"] or e["created"] < cutoff)]
+        state["seen"].extend(old)
+        print(f"取得元が {state.get('source') or 'rss'} → {source} に変わりました。"
+              f"前回より古い {len(old)} 件は通知せず既読にします。")
+        state["source"] = source
+        save_state(state)
 
     seen, fails, titles = state["seen"], state["fails"], state["titles"]
     seen_set = set(seen)
-    new_entries = [e for e in reversed(entries) if e.id not in seen_set][:MAX_POSTS_PER_RUN]  # 古い順
-    print(f"新着 {len(new_entries)} 件")
+    unseen = [e for e in reversed(entries) if e["id"] not in seen_set]  # 古い順
+    skipped = [e for e in unseen if not flair_ok(e)]
+    for e in skipped:  # 対象外のフレアは既読にするだけ
+        seen.append(e["id"])
+    if skipped:
+        save_state(state)
+    new_entries = [e for e in unseen if flair_ok(e)][:MAX_POSTS_PER_RUN]
+    state["last_ok"] = time.time()
+    save_state(state)
+    print(f"取得元 {source}：新着 {len(new_entries)} 件（対象外のフレア {len(skipped)} 件は既読のみ）")
 
     for e in new_entries:
         if time.time() - started > RUN_TIME_BUDGET:
             print("時間切れのため、残りは次回の実行で処理します")
             break
 
-        title = e.get("title", "")
-        body = clean_text(e.get("summary") or (e.get("content") or [{}])[0].get("value", ""))
-        link = e.get("link", "")
-        print(f"- {title[:60]}")
+        title = e["title"]
+        body = e["body"]
+        link = e["link"]
+        print(f"- [{e['flair'] or '-'}] {title[:60]}")
 
         key = title_key(title)
         if key and time.time() - titles.get(key, 0) < TITLE_DEDUP_DAYS * 86400:
             print("  同じタイトルの投稿を最近送ったのでスキップ（再投稿・重複投稿）")
-            seen.append(e.id)
+            seen.append(e["id"])
             save_state(state)
             continue
 
@@ -293,17 +388,17 @@ def main():
             print("時間切れのため、残りは次回の実行で処理します")
             break
         except Exception as err:
-            count = fails.get(e.id, 0) + 1
+            count = fails.get(e["id"], 0) + 1
             print(f"  翻訳失敗 {count}/{MAX_TRANSLATE_TRIES} 回目: {err}")
             if count < MAX_TRANSLATE_TRIES:
-                fails[e.id] = count
+                fails[e["id"]] = count
                 save_state(state)
                 continue  # 送らずに次回の実行で再挑戦
             # 何度やってもダメなら、英語のまま印を付けて送る
             title_ja, summary_ja, tweet = f"【未翻訳】{title}", body[:200], None
 
         try:
-            post_discord(title_ja, summary_ja, link, title)
+            post_discord(title_ja, summary_ja, link, title, e["flair"])
         except Exception as err:
             print(f"  Discord 送信失敗、次回再試行: {err}")
             continue  # 既読にしない
@@ -314,12 +409,12 @@ def main():
             except Exception as err:
                 print(f"  X 投稿失敗: {err}")
 
-        seen.append(e.id)
+        seen.append(e["id"])
         if key:
             titles[key] = time.time()
-        fails.pop(e.id, None)
+        fails.pop(e["id"], None)
         # フィードから消えた古い投稿の失敗記録は掃除する
-        live = {x.id for x in entries}
+        live = {x["id"] for x in entries}
         for k in [k for k in fails if k not in live]:
             fails.pop(k)
         save_state(state)
