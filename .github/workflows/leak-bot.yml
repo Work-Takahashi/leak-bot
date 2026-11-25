@@ -42,6 +42,8 @@ jobs:
           X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
           ENABLE_X: ${{ vars.ENABLE_X }}
           FEED_URL: ${{ vars.FEED_URL }}
+          SOURCE: ${{ vars.SOURCE }}
+          FLAIR_FILTER: ${{ vars.FLAIR_FILTER }}
 
       - name: Save state
         if: always()
