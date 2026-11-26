@@ -1,7 +1,5 @@
 {
  "seen": [
-  "t3_1wsrxo3",
-  "t3_1wsviwj",
   "t3_1wswx7w",
   "t3_1wtaa91",
   "t3_1wtf0ui",
@@ -499,7 +497,9 @@
   "t3_1y5y43b",
   "t3_1y62tyo",
   "t3_1y66mcr",
-  "t3_1y66onc"
+  "t3_1y66onc",
+  "t3_1y67oh6",
+  "t3_1y67von"
  ],
  "fails": {},
  "titles": {
@@ -825,9 +825,10 @@
   "yookalayleeandtheimpossiblelairdefinitiveeditionpostedonjapaneshop": 1795625185.9328067,
   "validityaboutgta6onlinepcportrelease": 1795634162.0048194,
   "gtaviconsolegraphicssettingsrevealed": 1795690013.4648983,
-  "biggamedownloadappeared209gb": 1795704411.6788023
+  "biggamedownloadappeared209gb": 1795704411.6788023,
+  "right": 1795716965.7606497
  },
  "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795716053.908455
+ "last_ok": 1795716945.270319
 }
