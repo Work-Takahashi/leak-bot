@@ -1,6 +1,5 @@
 {
  "seen": [
-  "t3_1wqz8pg",
   "t3_1wrko8m",
   "t3_1ws4cu4",
   "t3_1wsrxo3",
@@ -499,7 +498,8 @@
   "t3_1y5fs5i",
   "t3_1y5g5e8",
   "t3_1y5gtw6",
-  "t3_1y5y43b"
+  "t3_1y5y43b",
+  "t3_1y62tyo"
  ],
  "fails": {},
  "titles": {
@@ -824,9 +824,10 @@
   "internalkillingfloor1mapfileshaveleakedincludingearlyversionsofthemapsincludedinthelevelupupdateaswellasacutmapandmore": 1795610758.4677308,
   "yookalayleeandtheimpossiblelairdefinitiveeditionpostedonjapaneshop": 1795625185.9328067,
   "validityaboutgta6onlinepcportrelease": 1795634162.0048194,
-  "gtaviconsolegraphicssettingsrevealed": 1795690013.4648983
+  "gtaviconsolegraphicssettingsrevealed": 1795690013.4648983,
+  "biggamedownloadappeared209gb": 1795704411.6788023
  },
  "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795703443.300082
+ "last_ok": 1795704193.0221994
 }
