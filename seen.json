@@ -829,7 +829,7 @@
   "right": 1795716965.7606497,
   "subscribetorawvisionpleaselinkbelow": 1795802520.0715072
  },
- "fetch_fail_streak": 0,
+ "fetch_fail_streak": 1,
  "source": "arctic",
  "last_ok": 1795815936.5979571
 }
