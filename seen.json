@@ -1,6 +1,5 @@
 {
  "seen": [
-  "t3_1wu7fn9",
   "t3_1wua1vs",
   "t3_1wue44a",
   "t3_1wuegpy",
@@ -499,7 +498,8 @@
   "t3_1y6iuu0",
   "t3_1y6px7v",
   "t3_1y6z4jf",
-  "t3_1y6z9kr"
+  "t3_1y6z9kr",
+  "t3_1y6znmz"
  ],
  "fails": {},
  "titles": {
@@ -826,9 +826,10 @@
   "validityaboutgta6onlinepcportrelease": 1795634162.0048194,
   "gtaviconsolegraphicssettingsrevealed": 1795690013.4648983,
   "biggamedownloadappeared209gb": 1795704411.6788023,
-  "right": 1795716965.7606497
+  "right": 1795716965.7606497,
+  "subscribetorawvisionpleaselinkbelow": 1795802520.0715072
  },
  "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795801535.4539354
+ "last_ok": 1795802452.4157324
 }
