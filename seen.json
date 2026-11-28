@@ -1,7 +1,5 @@
 {
  "seen": [
-  "t3_1wuegpy",
-  "t3_1wuf9zv",
   "t3_1wugg44",
   "t3_1wui11i",
   "t3_1wuuui3",
@@ -499,7 +497,9 @@
   "t3_1y6z9kr",
   "t3_1y6znmz",
   "t3_1y70ezr",
-  "t3_1y74uk8"
+  "t3_1y74uk8",
+  "t3_1y783b9",
+  "t3_1y783bf"
  ],
  "fails": {},
  "titles": {
@@ -829,7 +829,7 @@
   "right": 1795716965.7606497,
   "subscribetorawvisionpleaselinkbelow": 1795802520.0715072
  },
- "fetch_fail_streak": 1,
+ "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795823135.0119689
+ "last_ok": 1795824937.0403554
 }
