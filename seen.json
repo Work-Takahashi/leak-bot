@@ -1,6 +1,5 @@
 {
  "seen": [
-  "t3_1wuuui3",
   "t3_1wuwf2m",
   "t3_1wuxkga",
   "t3_1wuzob7",
@@ -499,7 +498,8 @@
   "t3_1y783b9",
   "t3_1y783bf",
   "t3_1y78q3u",
-  "t3_1y79oav"
+  "t3_1y79oav",
+  "t3_1y79pso"
  ],
  "fails": {},
  "titles": {
@@ -833,5 +833,5 @@
  },
  "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795829448.9619975
+ "last_ok": 1795830331.5311685
 }
