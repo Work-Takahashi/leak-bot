@@ -1,6 +1,5 @@
 {
  "seen": [
-  "t3_1wugg44",
   "t3_1wui11i",
   "t3_1wuuui3",
   "t3_1wuwf2m",
@@ -499,7 +498,8 @@
   "t3_1y70ezr",
   "t3_1y74uk8",
   "t3_1y783b9",
-  "t3_1y783bf"
+  "t3_1y783bf",
+  "t3_1y78q3u"
  ],
  "fails": {},
  "titles": {
@@ -827,9 +827,10 @@
   "gtaviconsolegraphicssettingsrevealed": 1795690013.4648983,
   "biggamedownloadappeared209gb": 1795704411.6788023,
   "right": 1795716965.7606497,
-  "subscribetorawvisionpleaselinkbelow": 1795802520.0715072
+  "subscribetorawvisionpleaselinkbelow": 1795802520.0715072,
+  "microsoftsxboxgamedevelopmentkitallegedlyhasleakedthiscouldhelpwithongoingportingefforts": 1795826852.5069852
  },
  "fetch_fail_streak": 0,
  "source": "arctic",
- "last_ok": 1795825849.3996263
+ "last_ok": 1795826730.3911884
 }
